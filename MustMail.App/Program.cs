@@ -283,8 +283,8 @@ else
     throw new InvalidOperationException("No valid database connection string found!");
 }
 
-// If running in development capture ef core migration issues
-if (builder.Environment.IsDevelopment())
+// If running in development and web ui is enabled show database expection page
+if (builder.Environment.IsDevelopment() && mustMailConfiguration.Web.Enabled)
     _ = builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // Run database migrations 
@@ -325,37 +325,45 @@ builder.Services.Configure<ForwardedHeadersOptions>(options => {
     options.KnownProxies.Clear();
 });
 
-// Add ODIC Authentication
-builder.Services.AddAuthentication(options => {
+// Only add ODIC  if the web UI is enabled
+if (mustMailConfiguration.Web.Enabled)
+{
+
+    // Validate required environment variables
+    Helpers.ValidateOpenIdConnectEnvironmentVariables();
+
+    // Add ODIC Authentication
+    builder.Services.AddAuthentication(options => {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
     })
-    .AddOpenIdConnect(options => {
-        options.Authority = mustMailConfiguration.OpenIdConnect.Authority;
-        options.ClientId = mustMailConfiguration.OpenIdConnect.ClientId;
-        options.ClientSecret = mustMailConfiguration.OpenIdConnect.ClientSecret;
-        options.Scope.Add("openid");
-        options.Scope.Add("profile");
-        options.Scope.Add("email");
-        options.TokenValidationParameters.NameClaimType = mustMailConfiguration.OpenIdConnect.NameClaim;
-        options.ResponseType = OpenIdConnectResponseType.Code;
-        options.Events = new OpenIdConnectEvents
-        {
-            OnTokenValidated = OpenIdConnectHandlers.OnTokenValidated
-        };
-    })
-    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
+        .AddOpenIdConnect(options => {
+            options.Authority = mustMailConfiguration.OpenIdConnect.Authority;
+            options.ClientId = mustMailConfiguration.OpenIdConnect.ClientId;
+            options.ClientSecret = mustMailConfiguration.OpenIdConnect.ClientSecret;
+            options.Scope.Add("openid");
+            options.Scope.Add("profile");
+            options.Scope.Add("email");
+            options.TokenValidationParameters.NameClaimType = mustMailConfiguration.OpenIdConnect.NameClaim;
+            options.ResponseType = OpenIdConnectResponseType.Code;
+            options.Events = new OpenIdConnectEvents
+            {
+                OnTokenValidated = OpenIdConnectHandlers.OnTokenValidated
+            };
+        })
+        .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
 
-// Non-interactive token refresh using Duende Access Token Management
-builder.Services.AddOpenIdConnectAccessTokenManagement();
+    // Non-interactive token refresh using Duende Access Token Management
+    builder.Services.AddOpenIdConnectAccessTokenManagement();
 
-// Create authorization policy for admin page
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("MustMailAdmin", p =>
-                   p.RequireClaim("must_mail_role", "admin"));
+    // Create authorization policy for admin page
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("MustMailAdmin", p =>
+                       p.RequireClaim("must_mail_role", "admin"));
 
-// Add Cascading Authentication State
-builder.Services.AddCascadingAuthenticationState();
+    // Add Cascading Authentication State
+    builder.Services.AddCascadingAuthenticationState();
+}
 
 // Add update service
 builder.Services.AddSingleton<UpdateService>();
@@ -529,20 +537,24 @@ if (mustMailConfiguration.Mail.StoreMail)
 
 }
 
-// Add MudBlazor services
-builder.Services.AddMudServices(config =>
+// Only register the web UI if it is enabled
+if (mustMailConfiguration.Web.Enabled)
 {
-    config.SnackbarConfiguration.SnackbarVariant = Variant.Text;
-    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomLeft;
-    config.SnackbarConfiguration.BackgroundBlurred = true;
-});
+    // Add MudBlazor services
+    builder.Services.AddMudServices(config =>
+    {
+        config.SnackbarConfiguration.SnackbarVariant = Variant.Text;
+        config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomLeft;
+        config.SnackbarConfiguration.BackgroundBlurred = true;
+    });
 
-// Add MudBlazor Extensions services
-builder.Services.AddMudExtensions();
+    // Add MudBlazor Extensions services
+    builder.Services.AddMudExtensions();
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    // Add services to the container.
+    builder.Services.AddRazorComponents()
+        .AddInteractiveServerComponents();
+}
 
 // Health check for database
 builder.Services.AddHealthChecks()
@@ -593,24 +605,29 @@ using (IServiceScope scope = app.Services.CreateScope())
     }
 }
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    _ = app.UseExceptionHandler("/Error", true);
-    _ = app.UseMigrationsEndPoint();
-}
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-
 app.UseForwardedHeaders();
-app.UseAuthentication();
-app.UseAuthorization();
 
-app.UseAntiforgery();
+// Add these middlewares only if the web UI is enabled.
+if (mustMailConfiguration.Web.Enabled)
+{
+    // Configure the HTTP request pipeline.
+    if (!app.Environment.IsDevelopment())
+    {
+        _ = app.UseExceptionHandler("/Error", true);
+        _ = app.UseMigrationsEndPoint();
+    }
+    app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
-// Map login and logout endpoints
-app.MapGroup("/authentication").MapLoginAndLogout();
+    app.UseAuthentication();
+    app.UseAuthorization();
 
-// Map static folder maildrop if we are storing emails
+    app.UseAntiforgery();
+
+    // Map login and logout endpoint
+    app.MapGroup("/authentication").MapLoginAndLogout();
+}
+
+// Create folder maildrop if we are storing emails
 if (mustMailConfiguration.Mail.StoreMail)
 {
     // Create maildrop folder
@@ -619,18 +636,26 @@ if (mustMailConfiguration.Mail.StoreMail)
 
     if (app.Logger.IsEnabled(LogLevel.Information))
         app.Logger.LogInformation("Using maildrop folder in data directory: {MaildropPath}", maildropFolder);
+}
 
+// Map static folder maildrop if we are storing emails and the web UI is enabled
+if (mustMailConfiguration.Web.Enabled && mustMailConfiguration.Mail.StoreMail)
+{
+   
     // Create a custom static path at /maildrop for eml files and attachments 
     _ = app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(maildropFolder),
+        FileProvider = new PhysicalFileProvider(Path.Combine(dataFolder, "maildrop")),
         RequestPath = "/maildrop",
         OnPrepareResponse = MaildropStaticFileAuth.OnPrepareResponse
     });
 }
 
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+if (mustMailConfiguration.Web.Enabled)
+{
+    app.MapStaticAssets();
+    app.MapRazorComponents<App>()
+        .AddInteractiveServerRenderMode();
+}
 
 app.Run();

@@ -12,6 +12,7 @@ public class Configuration
     public MailConfiguration Mail { get; init; } = new();
     public CertificateConfiguration Certificate { get; init; } = new();
     public SerilogConfiguration Serilog { get; set; } = new();
+    public WebConfiguration Web { get; init; } = new();
 
 }
 
@@ -67,6 +68,11 @@ public class CertificateConfiguration
     public string? PEMKeyPath { get; set; }
     public string CommonName { get; set; } = "localhost";
 
+}
+
+public class WebConfiguration
+{
+    public bool Enabled { get; set; } = true;
 }
 
 public class SerilogConfiguration
