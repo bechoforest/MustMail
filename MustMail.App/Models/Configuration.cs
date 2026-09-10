@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace MustMail.App.Models;
 
@@ -6,12 +7,12 @@ public class Configuration
 {
     public string AllowedHosts { get; set; } = "*";
     public string Urls { get; set; } = "http://0.0.0.0:5000";
-    public MicrosoftGraphConfiguration Graph { get; init; } = new();
-    public OpenIdConnectConfiguration OpenIdConnect { get; init; } = new();
+    public MicrosoftGraphConfiguration Graph { get; private init; } = new();
+    public OpenIdConnectConfiguration OpenIdConnect { get; private init; } = new();
     public SmtpConfiguration Smtp { get; init; } = new();
     public MailConfiguration Mail { get; init; } = new();
     public CertificateConfiguration Certificate { get; init; } = new();
-    public SerilogConfiguration Serilog { get; set; } = new();
+    public SerilogConfiguration Serilog { get; init; } = new();
     public WebConfiguration Web { get; init; } = new();
     public ApiConfiguration Api { get; init; } = new();
 
@@ -21,6 +22,8 @@ public class MicrosoftGraphConfiguration
 {
     public string? TenantId { get; set; }
     public string? ClientId { get; set; }
+
+    [JsonIgnore]
     public string? ClientSecret { get; set; }
 }
 
@@ -29,6 +32,8 @@ public class OpenIdConnectConfiguration
     public string NameClaim { get; set; } = "name";
     public string? Authority { get; set; }
     public string? ClientId { get; set; }
+
+    [JsonIgnore]
     public string? ClientSecret { get; set; }
 }
 
@@ -65,6 +70,8 @@ public class CertificateConfiguration
     public bool Managed { get; set; } = true;
     public string? Format { get; set; }
     public string? PFXPath { get; set; }
+
+    [JsonIgnore]
     public string? Password { get; set; }
     public string? PEMCertPath { get; set; }
     public string? PEMKeyPath { get; set; }
@@ -80,6 +87,8 @@ public class WebConfiguration
 public class ApiConfiguration
 {
     public bool Enabled { get; set; } = false;
+
+    [JsonIgnore]
     public string? Key { get; set; }
 }
 
