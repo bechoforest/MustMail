@@ -33,13 +33,14 @@ Features:
 - SMTP authentication support
 - TLS encryption (STARTTLS and implicit TLS)
 - Local mail storage
-- Web interface for browsing messages and configuring the application 
+- Web interface for browsing messages and configuring the application, or disable it entirely to run as an SMTP-only relay
 - OAuth authentication with Microsoft Graph for outbound delivery
 - Restrict allowed sender or recipient addresses globally or at account level
 - Send from any user or shared mailbox in your Microsoft 365 Tenant including shared mailboxes and aliases
 - User and IP rate limiting
 - Retry failed email deliveries with backoff
-- Send delivery errors to a notification address and users (if enabled) as well as storing in the logs
+- Send delivery errors to a notification address and users (if enabled), store them in the logs, and record them for review on the admin Failed Messages page
+- Optional API key-authenticated stats endpoint for basic usage metrics
 
 <img src=".images/architecture.excalidraw.svg">
 
@@ -82,21 +83,21 @@ Features:
 - ~~Add the ability to restrict an SMTP account to a specific sender or recipients~~ Implemented
 
 ### v0.6.x 
-- ~~Retry failed email deliveries with backoff~~
-- ~~Send delivery errors to a notification address instead of only writing them to the logs~~
+- ~~Retry failed email deliveries with backoff~~ Implemented
+- ~~Send delivery errors to a notification address instead of only writing them to the logs~~ Implemented
 
-### v0.7.x
-- Add support for the Gmail Send API, subject to further research
-
-### v0.8.x 
+### v0.7.x 
 - Trigger webhooks when emails are received 
-- Don't require an account to already exist to store email
-- Support a mode that does not require Microsoft Graph or the Gmail Send API, allowing emails to be viewed only through the web interface
+- ~~Don't require an account to already exist to store email~~ Implemented
+
+### v0.8.x
+- ~~Store emails that repeatedly fail to send and notify the notification address so an administrator can review them~~ Implemented
+- Add an admin dashboard for email statistics and ~~API endpoint~~ Partially Implemented
+- Add search in the web interface
 
 ### v0.9.x
-- Store emails that repeatedly fail to send and notify the notification address so an administrator can review them
-- Add an admin dashboard for email statistics and API endpoint 
-- Add search in the web interface
+- Add support for the Gmail Send API, subject to further research
+- Support a mode that does not require Microsoft Graph or the Gmail Send API, allowing emails to be viewed only through the web interface
 
 ## Prerequisites
 - A Microsoft 365 Tenant.
@@ -410,9 +411,37 @@ When enabled, MustMail adds the following footer to the end of outgoing emails:
 
 ### Store Emails
 
-When enabled, MustMail stores emails received by users who have signed into MustMail and are recipients of the message.
+When `Mail:StoreMailContent` is enabled, MustMail stores a copy of each email's content (body and attachments) in the `maildrop` folder within the `Data` directory, in addition to always keeping a record of its metadata (sender, subject, recipients, timestamp).
 
-Emails are stored in the `maildrop` folder within the `Data` directory and retained for the number of days configured by `RetentionDays` (7 days by default). Once the retention period expires, the emails are automatically removed.
+Two separate retention periods control how long this data is kept:
+- `Mail:MailContentRetentionDays` (30 days by default) - how long the stored content (`.eml` file and attachments) is kept. Once this expires, the content is deleted but the email's metadata is kept.
+- `Mail:MailRetentionDays` (1461 days / ~4 years by default) - how long the email's metadata is kept before the record is removed entirely.
+
+### Web Interface
+
+The web interface (login, message browsing, and the admin pages) can be disabled entirely by setting `Web:Enabled` to `false`, so MustMail runs purely as an SMTP-to-Graph relay with no HTTP login, maildrop download endpoints, or configuration UI. This also means the OpenID Connect environment variables are not required when the web interface is disabled - see [Required Environment Variables](#required-environment-variables).
+
+### Failed Messages
+
+Emails that are rejected (e.g. a disallowed sender or recipient) or that fail to send after retries are recorded and can be reviewed on the admin Failed Messages page (`/admin/failed-messages`), alongside the existing error notification email. Failed messages are subject to the same retention periods as successfully delivered ones.
+
+### Stats API
+
+MustMail can optionally expose a small, read-only stats endpoint (`GET /api/stats`) returning basic email counts. It is disabled by default and authenticated separately from the web interface using an API key, not the web UI's login.
+
+To enable it, set:
+```
+MustMail__Api__Enabled=true
+MustMail__Api__Key=your-secret-key
+```
+
+Then call the endpoint with the key as either a header or a query parameter named `X-Api-Key`:
+```bash
+curl -H "X-Api-Key: your-secret-key" https://your-mustmail-host/api/stats
+```
+
+> [!NOTE]
+> Query-string API keys are logged by most web servers and appear in browser history - prefer the header form outside of quick manual testing.
 
 ### Allowed Senders / Allowed Recipients
 
@@ -451,9 +480,9 @@ For security reasons, the following settings must be provided using environment 
 - `MustMail__Graph__TenantId`
 - `MustMail__Graph__ClientId`
 - `MustMail__Graph__ClientSecret`
-- `MustMail__OpenIdConnect__Authority`
-- `MustMail__OpenIdConnect__ClientId`
-- `MustMail__OpenIdConnect__ClientSecret`
+- `MustMail__OpenIdConnect__Authority` (required only when `Web:Enabled` is true, which is the default)
+- `MustMail__OpenIdConnect__ClientId` (required only when `Web:Enabled` is true, which is the default)
+- `MustMail__OpenIdConnect__ClientSecret` (required only when `Web:Enabled` is true, which is the default)
 - `MustMail__Certificate__Password` (required only when MustMail__Certificate__Format is set to PFX, which is the default on Windows)
 - `MustMail__Mail__NotificationSenderAddress`
 - `MustMail__Mail__NotificationRecipientAddress`
@@ -547,11 +576,15 @@ Configure a file logging sink in Serilog.
   },
   "Mail": {
     "TrustFrom": true,
-    "StoreMail": true,
-    "RetentionDays": 7,
+    "StoreMailContent": true,
+    "MailContentRetentionDays": 30,
+    "MailRetentionDays": 1461,
     "AllowedSenders": [],
     "AllowedRecipients": [],
-    "FooterBranding": true
+    "FooterBranding": true,
+    "NotificationSenderAddress": "servers@example.com",
+    "NotificationRecipientAddress": "admin@example.com",
+    "NotifyUsersOnError": true
   },
   "Certificate": {
     "Managed": true, // Or False
@@ -560,6 +593,13 @@ Configure a file logging sink in Serilog.
     "PEMCertPath": "/home/test/certs/cert.pem", // Set this for PEM
     "PEMKeyPath": "/home/test/certs/key.pem", // And this for PEM as well
     "CommonName": "localhost" // Only required when Managed is true 
+  },
+  "Web": {
+    "Enabled": true // Set to false to run as an SMTP-only relay with no web interface
+  },
+  "Api": {
+    "Enabled": false, // Set to true to expose the /api/stats endpoint
+    "Key": "" // Required if Enabled is true - the value clients must pass as X-Api-Key
   },
   "Serilog": {
     "Using": [
