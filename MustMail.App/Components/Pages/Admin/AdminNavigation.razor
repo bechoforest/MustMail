@@ -24,6 +24,12 @@
                        Color="@(IsCurrentPage("smtp-accounts") ? Color.Primary : Color.Default)">
                 Accounts
             </MudButton>
+            <MudButton Href="/admin/failed-messages"
+                       StartIcon="@Icons.Material.Filled.ErrorOutline"
+                       Variant="@(IsCurrentPage("failed-messages") ? Variant.Filled : Variant.Text)"
+                       Color="@(IsCurrentPage("failed-messages") ? Color.Primary : Color.Default)">
+                Failed
+            </MudButton>
         </MudStack>
 
       
@@ -103,6 +109,13 @@
         Variant="Variant.Text"
         Class="@(IsCurrentPage("smtp-accounts") ? "admin-nav-active" : null)">
             SMTP Accounts
+        </MudButton>
+
+        <MudButton Href="/admin/failed-messages"
+        StartIcon="@Icons.Material.Filled.ErrorOutline"
+        Variant="Variant.Text"
+        Class="@(IsCurrentPage("failed-messages") ? "admin-nav-active" : null)">
+            Failed Messages
         </MudButton>
 
         <MudDivider Vertical="true" FlexItem="true" Class="mx-2" />

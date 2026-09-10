@@ -15,6 +15,8 @@ public class Message
     public required string Subject { get; init; }
     public int AttachmentCount { get; init; }
     public bool ContentStored { get; set; } = false;
+    public bool DeliveryFailed { get; set; }
+    public string? DeliveryFailureReason { get; set; }
     public int? SMTPAccountId { get; init; }// Optional foreign key property
     public SMTPAccount? SMTPAccount { get; init; }// Optional reference navigation to principal
     public ICollection<MessageRecipient> Recipients { get; init; } = [];

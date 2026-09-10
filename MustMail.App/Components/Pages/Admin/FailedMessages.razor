@@ -1,0 +1,35 @@
+@page "/admin/failed-messages"
+@inherits FailedMessagesBase
+@attribute [Authorize(Policy = "MustMailAdmin")]
+<PageTitle> MustMail - Failed Messages </PageTitle>
+
+<AdminNavigation />
+
+<MudText Typo="Typo.h4">Failed Messages</MudText>
+
+<MudText Typo="Typo.subtitle2">
+	Emails that were rejected or failed to forward. These are never shown to recipients.
+</MudText>
+
+<MudDataGrid @ref="@Grid" T="Message" ServerData="ServerReload" ReadOnly="true" Bordered="true" Elevation="3" Class="mt-2" SortMode="SortMode.None">
+	<ToolBarContent>
+		<MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search by sender or subject" Adornment="Adornment.Start"
+					  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" />
+	</ToolBarContent>
+	<Columns>
+		<PropertyColumn Property="x => x.Timestamp" Title="Time" />
+		<PropertyColumn Property="x => x.SenderEmail" Title="Sender" />
+		<PropertyColumn Property="x => x.Subject" />
+		<PropertyColumn Property="x => x.DeliveryFailureReason" Title="Reason" />
+	</Columns>
+	<PagerContent>
+		<MudDataGridPager T="Message" />
+	</PagerContent>
+</MudDataGrid>
+
+<MudStack Row AlignItems="AlignItems.Center" Spacing="1" Class="mt-4">
+	<MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" Size="Size.Small" />
+	<MudText Typo="Typo.body2">
+		A message appears here after all delivery attempts have failed. It's kept only for review and is never shown to the intended recipient.
+	</MudText>
+</MudStack>

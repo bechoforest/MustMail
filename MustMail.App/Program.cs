@@ -1,3 +1,4 @@
+using AspNetCore.Authentication.ApiKey;
 using Azure.Core;
 using Azure.Identity;
 using DbUp;
@@ -5,9 +6,9 @@ using DbUp.Engine;
 using Duende.AccessTokenManagement.OpenIdConnect;
 using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Graph;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MudExtensions.Services;
@@ -364,6 +365,17 @@ if (mustMailConfiguration.Web.Enabled)
 
     // Add Cascading Authentication State
     builder.Services.AddCascadingAuthenticationState();
+
+    // Register API key authentication for the stats API only
+    if (mustMailConfiguration.Api.Enabled)
+    {
+        builder.Services.AddAuthentication()
+            .AddApiKeyInHeaderOrQueryParams<StatsApiKeyProvider>(options =>
+            {
+                options.Realm = "MustMail Stats API";
+                options.KeyName = "X-Api-Key";
+            });
+    }
 }
 
 // Add update service
@@ -495,7 +507,7 @@ builder.Services.AddSingleton<AttachmentHandler>();
 builder.Services.AddSingleton<MessageStorage>();
 
 // Add error notification handler for notify the notication address and users (if enabled) of an error
-builder.Services.AddSingleton<ErrorNotificationHandler>();
+builder.Services.AddSingleton<DeliveryFailureHandler>();
 
 // Resilience pipeline for Microsoft Graph send retries
 builder.Services.AddResiliencePipeline("graph-send", static (builder, context) =>
@@ -651,13 +663,27 @@ if (mustMailConfiguration.Mail.StoreMailContent)
         app.Logger.LogInformation("Using maildrop folder in data directory: {MaildropPath}", maildropFolder);
 }
 
-// Map maildrop endpoints for downloading stored emails and attachments if we are storing emails and the web UI is enabled.
+// Map maildrop endpoints for downloading stored emails and attachments if we are storing emails and the web UI is enabled
 if (mustMailConfiguration.Web.Enabled && mustMailConfiguration.Mail.StoreMailContent)
 {
     RouteGroupBuilder maildrop = app.MapGroup("/maildrop").RequireAuthorization();
 
     maildrop.MapGet("/{messageId}.eml", MaildropEndpoints.DownloadEmail);
     maildrop.MapGet("/{messageId}/{fileName}", MaildropEndpoints.DownloadAttachment);
+
+    if (app.Logger.IsEnabled(LogLevel.Information))
+        app.Logger.LogInformation("/maildrop web endpoint enabled for eml and attachments download");
+}
+
+// Map stats endpoints, authenticated by API key only
+if (mustMailConfiguration.Web.Enabled && mustMailConfiguration.Api.Enabled)
+{
+    app.MapGroup("/api/stats")
+        .RequireAuthorization(new AuthorizeAttribute { AuthenticationSchemes = ApiKeyDefaults.AuthenticationScheme })
+        .MapGet("", StatsEndpoints.GetStats);
+
+    if (app.Logger.IsEnabled(LogLevel.Information))
+        app.Logger.LogInformation("/api/stats endpoint enabled, authenticate via API key");
 }
 
 if (mustMailConfiguration.Web.Enabled)

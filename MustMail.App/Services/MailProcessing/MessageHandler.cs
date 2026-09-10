@@ -13,7 +13,7 @@ using System.Text.Json;
 
 namespace MustMail.App.Services.MailProcessing;
 
-public partial class MessageHandler(ILogger<MessageHandler> logger, GraphServiceClient graphClient, IOptionsMonitor<Configuration> config, RecipientResolver recipientsResolver, ErrorNotificationHandler errorNotificationHandler, SenderResolver senderResolver, SmtpAccountAuthorization smtpAccountAuthorization, AttachmentHandler attachmentHandler, MessageStorage messageStorage, ResiliencePipeline graphSendPipeline) : MessageStore
+public partial class MessageHandler(ILogger<MessageHandler> logger, GraphServiceClient graphClient, IOptionsMonitor<Configuration> config, RecipientResolver recipientsResolver, DeliveryFailureHandler deliveryFailureHandler, SenderResolver senderResolver, SmtpAccountAuthorization smtpAccountAuthorization, AttachmentHandler attachmentHandler, MessageStorage messageStorage, ResiliencePipeline graphSendPipeline) : MessageStore
 {
     public override async Task<SmtpResponse> SaveAsync(ISessionContext context, IMessageTransaction transaction, ReadOnlySequence<byte> buffer, CancellationToken cancellationToken)
     {
@@ -57,14 +57,14 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
         // If an SMTP response is provided return it
         if (sender.SmtpResponse != null)
         {
-            await errorNotificationHandler.Notify(sender.FailureReason!, message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure(sender.FailureReason!, message, sender, cancellationToken);
             return sender.SmtpResponse;
         }
 
         // These should not be null
         if (sender.Name == null || sender.Address == null || sender.User == null)
         {
-            await errorNotificationHandler.Notify("Sender resolution returned incomplete data", message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure("Sender resolution returned incomplete data", message, sender, cancellationToken);
             return SmtpResponse.SyntaxError;
         }
 
@@ -72,7 +72,7 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
         if (!senderAllowed)
         {
             LogSenderNotAllowed(context.Authentication.User, sender.Address);
-            await errorNotificationHandler.Notify($"Sender {sender.Address} is not permitted for SMTP account '{context.Authentication.User}'", message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure($"Sender {sender.Address} is not permitted for SMTP account '{context.Authentication.User}'", message, sender, cancellationToken);
             return SmtpResponse.MailboxNameNotAllowed;
         }
 
@@ -86,7 +86,7 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
             string rejectedList = recipients.Rejected.Count > 0
                 ? $"Rejected by global allowed recipients list: {string.Join(", ", recipients.Rejected.Select(r => r.EmailAddress?.Address))}"
                 : "No recipients were provided";
-            await errorNotificationHandler.Notify(rejectedList, message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure(rejectedList, message, sender, cancellationToken);
             return SmtpResponse.NoValidRecipientsGiven;
         }
 
@@ -95,7 +95,7 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
         {
             LogRecipientsNotAllowed(context.Authentication.User);
             string rejectedList = string.Join(", ", accountRejected.Select(r => r.EmailAddress?.Address));
-            await errorNotificationHandler.Notify($"Recipients rejected by SMTP account '{context.Authentication.User}' allowed list: {rejectedList}", message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure($"Recipients rejected by SMTP account '{context.Authentication.User}' allowed list: {rejectedList}", message, sender, cancellationToken);
             return SmtpResponse.NoValidRecipientsGiven;
         }
 
@@ -174,7 +174,7 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
         {
             LogGraphSendFailed(ex, sender.Address);
             string allRecipients = string.Join(", ", recipients.All.Select(r => r.EmailAddress?.Address));
-            await errorNotificationHandler.Notify($"Microsoft Graph failed to send from {sender.Address} to [{allRecipients}]: {ex.Message}", message, sender, cancellationToken);
+            await deliveryFailureHandler.ReportFailure($"Microsoft Graph failed to send from {sender.Address} to [{allRecipients}]: {ex.Message}", message, sender, cancellationToken);
             return SmtpResponse.SyntaxError;
         }
         finally

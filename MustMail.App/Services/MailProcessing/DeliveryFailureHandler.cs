@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Users.Item.SendMail;
@@ -8,10 +8,13 @@ using Polly.Registry;
 
 namespace MustMail.App.Services.MailProcessing
 {
-    public partial class ErrorNotificationHandler(IOptionsMonitor<Configuration> config, ILogger<ErrorNotificationHandler> logger, GraphUserLookupService graphUserLookupService, GraphServiceClient graphClient, ResiliencePipelineProvider<string> resiliencePipelineProvider)
+    public partial class DeliveryFailureHandler(IOptionsMonitor<Configuration> config, ILogger<DeliveryFailureHandler> logger, GraphUserLookupService graphUserLookupService, GraphServiceClient graphClient, ResiliencePipelineProvider<string> resiliencePipelineProvider, IDbContextFactory<DatabaseContext> dbFactory)
     {
-        public async Task Notify(string reason, MimeMessage message, ResolvedSender? sender, CancellationToken cancellationToken = default)
+        public async Task ReportFailure(string reason, MimeMessage message, ResolvedSender? sender, CancellationToken cancellationToken = default)
         {
+            // Record the failure so it's reviewable later, then notify the configured address
+            await RecordFailure(message, sender, reason);
+
             Microsoft.Graph.Models.User? notificationSenderUser = await graphUserLookupService.FindSenderUserAsync("MustMail__Mail__NotificationSenderAddress", config.CurrentValue.Mail.NotificationSenderAddress!);
 
             if (notificationSenderUser is null)
@@ -56,6 +59,36 @@ namespace MustMail.App.Services.MailProcessing
             {
                 ResilienceContextPool.Shared.Return(resilienceContext);
             }
+        }
+
+        // Flags the message as failed if it was already stored (e.g. the Graph send itself failed), or inserts a row if it was rejected before storage was attempted
+        private async Task RecordFailure(MimeMessage message, ResolvedSender? sender, string reason)
+        {
+            await using DatabaseContext dbContext = await dbFactory.CreateDbContextAsync();
+
+            Models.Message? existing = await dbContext.Message.FindAsync(message.MessageId);
+
+            if (existing != null)
+            {
+                existing.DeliveryFailed = true;
+                existing.DeliveryFailureReason = reason;
+            }
+            else
+            {
+                dbContext.Message.Add(new Models.Message
+                {
+                    Id = message.MessageId!,
+                    SenderName = sender?.Name ?? "Unknown",
+                    SenderEmail = sender?.Address ?? "Unknown",
+                    Timestamp = message.Date.DateTime.ToUniversalTime(),
+                    Subject = message.Subject ?? "(No subject)",
+                    AttachmentCount = message.Attachments.Count(),
+                    DeliveryFailed = true,
+                    DeliveryFailureReason = reason
+                });
+            }
+
+            _ = await dbContext.SaveChangesAsync();
         }
 
         private static string BuildHtmlBody(string reason, MimeMessage message, ResolvedSender? sender)

@@ -115,10 +115,10 @@ public class HomeBase : ComponentBase
     {
         await using DatabaseContext dbContext = await DbFactory.CreateDbContextAsync();
 
-        // Get messages where this user's email is one of the recipients
+        // Get messages where this user's email is one of the recipients, excluding ones that failed to send
         List<Message> messages = await dbContext.Message
             .Include(m => m.Recipients)
-            .Where(m => m.Recipients.Any(r => r.Email == UserEmail))
+            .Where(m => !m.DeliveryFailed && m.Recipients.Any(r => r.Email == UserEmail))
             .OrderByDescending(m => m.Timestamp)
             .ToListAsync();
 
@@ -230,7 +230,7 @@ public class HomeBase : ComponentBase
         await using DatabaseContext dbContext = await DbFactory.CreateDbContextAsync();
 
         Message message = await dbContext.Message.Include(m => m.Recipients)
-            .Where(m => m.Recipients.Any(r => r.Email == UserEmail)).SingleAsync(m => m.Id == messageId);
+            .Where(m => !m.DeliveryFailed && m.Recipients.Any(r => r.Email == UserEmail)).SingleAsync(m => m.Id == messageId);
 
         if (message.ContentStored && StoreMailContent)
         {

@@ -12,6 +12,7 @@
 
 
     <ItemGroup>
+        <PackageReference Include="AspNetCore.Authentication.ApiKey" Version="9.0.0" />
         <PackageReference Include="CodeBeam.MudBlazor.Extensions" Version="9.1.0" />
         <PackageReference Include="CompareNETObjects" Version="4.84.0" />
         <PackageReference Include="dbup" Version="5.0.41" />

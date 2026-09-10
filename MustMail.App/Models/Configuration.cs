@@ -6,13 +6,14 @@ public class Configuration
 {
     public string AllowedHosts { get; set; } = "*";
     public string Urls { get; set; } = "http://0.0.0.0:5000";
-    public MicrosoftGraphConfiguration Graph { get; private init; } = new();
-    public OpenIdConnectConfiguration OpenIdConnect { get; private init; } = new();
+    public MicrosoftGraphConfiguration Graph { get; init; } = new();
+    public OpenIdConnectConfiguration OpenIdConnect { get; init; } = new();
     public SmtpConfiguration Smtp { get; init; } = new();
     public MailConfiguration Mail { get; init; } = new();
     public CertificateConfiguration Certificate { get; init; } = new();
     public SerilogConfiguration Serilog { get; set; } = new();
     public WebConfiguration Web { get; init; } = new();
+    public ApiConfiguration Api { get; init; } = new();
 
 }
 
@@ -64,7 +65,7 @@ public class CertificateConfiguration
     public bool Managed { get; set; } = true;
     public string? Format { get; set; }
     public string? PFXPath { get; set; }
-    public string? Password { get; private set; }
+    public string? Password { get; set; }
     public string? PEMCertPath { get; set; }
     public string? PEMKeyPath { get; set; }
     public string CommonName { get; set; } = "localhost";
@@ -74,6 +75,12 @@ public class CertificateConfiguration
 public class WebConfiguration
 {
     public bool Enabled { get; set; } = true;
+}
+
+public class ApiConfiguration
+{
+    public bool Enabled { get; set; } = false;
+    public string? Key { get; set; }
 }
 
 public class SerilogConfiguration
