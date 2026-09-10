@@ -152,6 +152,78 @@
 			</MudStack>
 		</MudItem>
 
+		@* Web Interface *@
+		<MudItem xs="12" md="6">
+
+			<MudStack Row AlignItems="AlignItems.Center" Spacing="0" Class="mb-1" Wrap="Wrap.Wrap">
+				<MudText Typo="Typo.subtitle1" Style="font-weight: bold;">
+					Web Interface
+				</MudText>
+
+				<MudSpacer/>
+
+				@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Web:Enabled"))
+				{
+					<MudChip Color="Color.Primary" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Storage">
+						Environment Variable
+					</MudChip>
+				}
+				else
+				{
+					<MudChip Color="Color.Info" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Description">
+						appsettings.json
+					</MudChip>
+				}
+
+			</MudStack>
+
+			<MudSwitch T="bool" @bind-Value="Configuration.Web.Enabled"
+			           Color="Color.Primary"
+			           Label="@(Configuration.Web.Enabled ? "Enabled" : "Disabled")"/>
+
+			<MudText Class="mud-input-helper-text">
+				If disabled, MustMail runs as an SMTP-only relay with no web UI, login, or maildrop download endpoints.
+			</MudText>
+
+			<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.Settings"
+					         Size="Size.Small"/>
+					<MudText Typo="Typo.caption">
+						appsettings.json / Environment Variable
+					</MudText>
+				</MudStack>
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.RestartAlt"
+					         Size="Size.Small"
+					         Color="Color.Warning"/>
+					<MudText Typo="Typo.caption">
+						Restart Required
+					</MudText>
+				</MudStack>
+
+			</MudStack>
+
+			<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0" Class="mt-2">
+				<MudChip Size="Size.Small"
+				         Variant="Variant.Text"
+				         Icon="@Icons.Material.Filled.Key" T="string"
+				         Style="font-family: monospace; margin-right: 0;">
+					MustMail__Web__Enabled
+				</MudChip>
+
+				<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+				               Size="Size.Small"
+							   OnClick="@(() => CopyToClipboard("MustMail__Web__Enabled"))" />
+			</MudStack>
+		</MudItem>
+
 		@* Database Connection String *@
 		<MudItem xs="12" md="6">
 

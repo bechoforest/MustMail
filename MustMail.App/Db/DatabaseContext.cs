@@ -7,4 +7,6 @@ public class DatabaseContext(DbContextOptions<DatabaseContext> options) : DbCont
     public DbSet<SMTPAccount> SMTPAccount { get; set; } = null!;
 
     public DbSet<Message> Message { get; set; } = null!;
+
+    public DbSet<MessageRecipient> MessageRecipient { get; set; } = null!;
 }

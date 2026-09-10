@@ -64,15 +64,6 @@
 
         _ = Users.Remove(item);
 
-        // Create file path
-        string path = Path.Combine(
-                                   AppContext.BaseDirectory,
-                                   "maildrop",
-                                   item.Id);
-
-        // Remove users emails
-        Directory.Delete(path);
-
         _ = dbContext.User.Remove(item);
         _ = await dbContext.SaveChangesAsync();
     }

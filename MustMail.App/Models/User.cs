@@ -12,5 +12,4 @@ public class User
     public required string Email { get; init; }
     public bool Admin { get; set; }
     public Profile Profile { get; init; } = new() { DateFormat = "dddd dd MMMM yyyy", TimeFormat = "HH:mm", TimeZone = "GMT" };
-    public ICollection<Message> Messages { get; } = [];
 }

@@ -46,8 +46,10 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
 #pragma warning restore CA1873// Avoid potentially expensive logging
         }
 
-        // If there is no message id create one
-        if (string.IsNullOrWhiteSpace(message.MessageId)) message.MessageId = MimeUtils.GenerateMessageId();
+        // If there is no message id, or the sender supplied one that isn't safe to use as a path segment e.g ".." or  or characters invalid in a file name
+        string maildropRoot = Path.Combine(AppContext.BaseDirectory, "Data", "maildrop");
+        if (string.IsNullOrWhiteSpace(message.MessageId) || !Helpers.IsPathSegmentSafe(maildropRoot, message.MessageId) || message.MessageId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            message.MessageId = MimeUtils.GenerateMessageId();
 
         // Get sender from message and SMTP transaction
         ResolvedSender sender = await senderResolver.ResolveSender(transaction, message);
@@ -105,12 +107,8 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
         if (message.Attachments.Any())
             attachments = await attachmentHandler.HandelAttachments(message);
 
-
         // If store emails is enabled for each recipient that has an account store a copy of the email on disk
-        if (config.CurrentValue.Mail.StoreMail)
-        {
-            await messageStorage.StoreMessage(message, recipients, sender);
-        }
+        await messageStorage.StoreMessage(message, recipients, sender, context.Authentication.User);
         
         // Create message 
         SendMailPostRequestBody requestBody = new()

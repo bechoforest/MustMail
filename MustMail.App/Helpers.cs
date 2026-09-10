@@ -6,14 +6,19 @@ namespace MustMail.App;
 
 public static class Helpers
 {
-    public static string SanitizeFilePath(string path)
+    public static string SanitizeFileName(string fileName)
     {
-        string directory = Path.GetDirectoryName(path)!;
-        string fileName = Path.GetFileName(path);
+        return Path.GetInvalidFileNameChars()
+            .Aggregate(fileName, (current, c) => current.Replace(c, '-'));
+    }
 
-        fileName = Path.GetInvalidFileNameChars().Aggregate(fileName, (current, c) => current.Replace(c, '-'));
+    // Will return true if path is not escaped i.e. segment can't escape it via ".."
+    public static bool IsPathSegmentSafe(string basePath, string segment)
+    {
+        string fullBasePath = Path.GetFullPath(basePath);
+        string fullPath = Path.GetFullPath(Path.Combine(fullBasePath, segment));
 
-        return Path.Combine(directory, fileName);
+        return fullPath.StartsWith(fullBasePath.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 
     public static void ValidateEnvironmentVariables()

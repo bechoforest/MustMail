@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using MimeKit;
 using MudBlazor.Extensions;
-using System.Security.Claims;
 using MustMail.App.Services.Maintenance;
+using System.Security.Claims;
 
 namespace MustMail.App.Components.Pages;
 
@@ -20,6 +20,7 @@ public class HomeBase : ComponentBase
 
     // Page variables
     protected string? UserId;
+    protected string? UserEmail;
     protected string Name = "";
     protected int MessageCount;
     protected string? MostRecentEmailSubject = "Unknown";
@@ -27,7 +28,7 @@ public class HomeBase : ComponentBase
     protected List<Message> Messages = [];
     protected MudTabs MessageTabs = null!;
     protected MimeMessage? ActiveMessage;
-    protected bool StoreEmails;
+    protected bool StoreMailContent;
     private string _maildropFolder = null!;
 
 
@@ -42,7 +43,7 @@ public class HomeBase : ComponentBase
     protected override async Task OnInitializedAsync()
     {
 
-        StoreEmails = Configuration.Get<Configuration>()!.Mail.StoreMail;
+        StoreMailContent = Configuration.Get<Configuration>()!.Mail.StoreMailContent;
 
         AuthenticationState authState = await AuthenticationState.GetAuthenticationStateAsync();
 
@@ -61,26 +62,19 @@ public class HomeBase : ComponentBase
         await dbContext.Entry(user).Reference(u => u.Profile).LoadAsync();
 
         UserId = user.Id;
+        UserEmail = user.Email;
         _profile = user.Profile;
 
+        _maildropFolder = Path.Combine(AppContext.BaseDirectory, "Data", "maildrop");
 
 
-        if (StoreEmails)
-        {
-
-            _maildropFolder = Path.Combine(AppContext.BaseDirectory, "Data", "maildrop");
-
-
-            // Subscribe to events for the current user id using the UpdateServer
-            _subscription = Updates.Subscribe(UserId, async () => {
-                await GetMessages();
-                await InvokeAsync(StateHasChanged);
-            });
-
+        // Subscribe to events for the current user id using the UpdateServer
+        _subscription = Updates.Subscribe(UserId, async () => {
             await GetMessages();
-        }
+            await InvokeAsync(StateHasChanged);
+        });
 
-
+        await GetMessages();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -96,8 +90,15 @@ public class HomeBase : ComponentBase
     {
         MobileSelectedMessage = message;
 
-        string path = Helpers.SanitizeFilePath(Path.Combine(_maildropFolder, UserId!, $"{message.Id}.eml"));
-        ActiveMessage = await MimeMessage.LoadAsync(path);
+        if (message.ContentStored && StoreMailContent)
+        {
+            string path = Path.Combine(_maildropFolder, $"{message.Id}.eml");
+            ActiveMessage = await MimeMessage.LoadAsync(path);
+        }
+        else
+        {
+            ActiveMessage = null;
+        }
 
         MobileShowDetail = true;
     }
@@ -114,38 +115,42 @@ public class HomeBase : ComponentBase
     {
         await using DatabaseContext dbContext = await DbFactory.CreateDbContextAsync();
 
-        // Get user including messages
-        User user = await dbContext.User.Include(u => u.Messages).SingleAsync(u => u.Id == UserId);
+        // Get messages where this user's email is one of the recipients
+        List<Message> messages = await dbContext.Message
+            .Include(m => m.Recipients)
+            .Where(m => m.Recipients.Any(r => r.Email == UserEmail))
+            .OrderByDescending(m => m.Timestamp)
+            .ToListAsync();
 
         // Set message count
-        MessageCount = user.Messages.Count;
+        MessageCount = messages.Count;
 
         // If there are messages get the most recent one
         if (MessageCount > 0)
         {
-            // Get the most recent message 
-            Message mostRecentMessage = user.Messages.OrderByDescending(m => m.Timestamp).First();
+            // Get the most recent message
+            Message mostRecentMessage = messages[0];
 
-            // Grab details for panel 
+            // Grab details for panel
             MostRecentEmailTimestamp = mostRecentMessage.Timestamp;
             MostRecentEmailSubject = mostRecentMessage.Subject;
 
-            // Create file path
-            string path = Path.Combine(
+            if (mostRecentMessage.ContentStored && StoreMailContent)
+            {
+                // Create file path
+                string path = Path.Combine(
                                        _maildropFolder,
-                                       user.Id,
                                        $"{mostRecentMessage.Id}.eml");
 
-            // Sanitize file path
-            path = Helpers.SanitizeFilePath(path);
-
-            // Load the eml file
-            ActiveMessage = await MimeMessage.LoadAsync(path);
+                // Load the eml file
+                ActiveMessage = await MimeMessage.LoadAsync(path);
+            }
+               
 
         }
 
         // All messages
-        Messages = [.. user.Messages.OrderByDescending(m => m.Timestamp)];
+        Messages = messages;
 
     }
 
@@ -214,7 +219,7 @@ public class HomeBase : ComponentBase
     }
 
     // Message changed - When tab changed, get the message id and load the eml file
-    protected void MessageChanged(int index)
+    protected async Task MessageChanged(int index)
     {
         if (index < 0 && index > MessageTabs.Panels.Count - 1)
             index = 1;
@@ -222,22 +227,40 @@ public class HomeBase : ComponentBase
         if (MessageTabs.Panels[index].ID is not string messageId)
             return;
 
-        if (UserId == null)
-            return;
+        await using DatabaseContext dbContext = await DbFactory.CreateDbContextAsync();
 
-        // Create file path
-        string path = Path.Combine(
+        Message message = await dbContext.Message.Include(m => m.Recipients)
+            .Where(m => m.Recipients.Any(r => r.Email == UserEmail)).SingleAsync(m => m.Id == messageId);
+
+        if (message.ContentStored && StoreMailContent)
+        {
+            // Create file path
+            string path = Path.Combine(
                                    _maildropFolder,
-                                   UserId,
                                    $"{messageId}.eml");
 
-        // Sanitize file path
-        path = Helpers.SanitizeFilePath(path);
+            // Load the eml file
+            ActiveMessage = MimeMessage.Load(path);
+        }
+        else
+        {
+            ActiveMessage = null;
+        }
+    }
 
-        // Load the eml file
-        ActiveMessage = MimeMessage.Load(path);
+    // Only the recipient actually bcc'd should see a Bcc line, and only their own address - never the other bcc'd recipients
+    protected bool IsUserBcc(Message message) =>
+        UserEmail != null && message.Recipients.Any(r => r.Type == RecipientType.Bcc && string.Equals(r.Email, UserEmail, StringComparison.OrdinalIgnoreCase));
 
+    // Recipients are stored in the database, so To/Cc can always be displayed regardless of whether the eml content is stored
+    protected static string FormatRecipients(Message message, RecipientType type)
+    {
+        IEnumerable<string> recipients = message.Recipients
+            .Where(r => r.Type == type)
+            .OrderBy(r => r.Position)
+            .Select(r => string.IsNullOrWhiteSpace(r.Name) ? r.Email : $"{r.Name} <{r.Email}>");
 
+        return string.Join(", ", recipients);
     }
 
     protected static string FormatAttachmentMeta(MimePart part)

@@ -164,7 +164,7 @@
 
 					<MudSpacer/>
 
-					@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Mail:StoreEmails"))
+					@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Mail:StoreMailContent"))
 					{
 						<MudChip Color="Color.Primary" T="string" Variant="Variant.Text" Size="Size.Small"
 						         Icon="@Icons.Material.Filled.Storage">
@@ -181,9 +181,9 @@
 
 				</MudStack>
 
-				<MudSwitch T="bool" @bind-Value="Configuration.Mail.StoreMail"
+				<MudSwitch T="bool" @bind-Value="Configuration.Mail.StoreMailContent"
 				           Color="Color.Primary"
-				           Label="@(Configuration.Mail.StoreMail ? "Enabled" : "Disabled")"/>
+				           Label="@(Configuration.Mail.StoreMailContent ? "Enabled" : "Disabled")"/>
 
 				<MudText Class="mud-input-helper-text">
 					If enabled, MustMail will store a copy of the forwarded emails.
@@ -214,26 +214,26 @@
 					         Variant="Variant.Text"
 					         Icon="@Icons.Material.Filled.Key" T="string"
 					         Style="font-family: monospace; margin-right: 0;">
-						MustMail__Mail__StoreEmails
+						MustMail__Mail__StoreMailContent
 					</MudChip>
 
 					<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
 					               Size="Size.Small"
-								   OnClick="@(() => CopyToClipboard("MustMail__Mail__StoreEmails"))" />
+								   OnClick="@(() => CopyToClipboard("MustMail__Mail__StoreMailContent"))" />
 				</MudStack>
 			</MudItem>
 
-			@* Retention Period *@
+			@* Content Retention Period *@
 			<MudItem xs="12" md="4">
 
 				<MudStack Row AlignItems="AlignItems.Center" Spacing="0" Class="mb-1" Wrap="Wrap.Wrap">
 					<MudText Typo="Typo.subtitle1" Style="font-weight: bold;">
-						Retention Period
+						Content Retention Period
 					</MudText>
 
 					<MudSpacer/>
 
-					@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Mail:RetentionDays"))
+					@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Mail:MailContentRetentionDays"))
 					{
 						<MudChip Color="Color.Primary" T="string" Variant="Variant.Text" Size="Size.Small"
 						         Icon="@Icons.Material.Filled.Storage">
@@ -251,8 +251,8 @@
 				</MudStack>
 
 				<MudNumericField T="int" Variant="Variant.Outlined" Min="1" Required
-				                 HelperText="How long in days to retain the stored emails for."
-				                 @bind-Value="Configuration.Mail.RetentionDays"/>
+				                 HelperText="How long in days to keep the stored email content (body/attachments) for. The email's details are kept beyond this."
+				                 @bind-Value="Configuration.Mail.MailContentRetentionDays"/>
 
 				<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
 
@@ -279,12 +279,77 @@
 					         Variant="Variant.Text"
 					         Icon="@Icons.Material.Filled.Key" T="string"
 					         Style="font-family: monospace; margin-right: 0;">
-						MustMail__Mail__RetentionDays
+						MustMail__Mail__MailContentRetentionDays
 					</MudChip>
 
 					<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
 					               Size="Size.Small"
-					               OnClick="@(() => CopyToClipboard("MustMail__Mail__RetentionDays"))"/>
+					               OnClick="@(() => CopyToClipboard("MustMail__Mail__MailContentRetentionDays"))"/>
+				</MudStack>
+			</MudItem>
+
+			@* Message Retention Period *@
+			<MudItem xs="12" md="4">
+
+				<MudStack Row AlignItems="AlignItems.Center" Spacing="0" Class="mb-1" Wrap="Wrap.Wrap">
+					<MudText Typo="Typo.subtitle1" Style="font-weight: bold;">
+						Message Retention Period
+					</MudText>
+
+					<MudSpacer/>
+
+					@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Mail:MailRetentionDays"))
+					{
+						<MudChip Color="Color.Primary" T="string" Variant="Variant.Text" Size="Size.Small"
+						         Icon="@Icons.Material.Filled.Storage">
+							Environment Variable
+						</MudChip>
+					}
+					else
+					{
+						<MudChip Color="Color.Info" T="string" Variant="Variant.Text" Size="Size.Small"
+						         Icon="@Icons.Material.Filled.Description">
+							appsettings.json
+						</MudChip>
+					}
+
+				</MudStack>
+
+				<MudNumericField T="int" Variant="Variant.Outlined" Min="1" Required
+				                 HelperText="How long in days to keep an email's details (sender, subject, recipients) before removing it entirely."
+				                 @bind-Value="Configuration.Mail.MailRetentionDays"/>
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
+
+					<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+						<MudIcon Icon="@Icons.Material.Filled.Settings"
+						         Size="Size.Small"/>
+						<MudText Typo="Typo.caption">
+							appsettings.json / Environment Variable
+						</MudText>
+					</MudStack>
+
+					<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+						<MudIcon Icon="@Icons.Material.Filled.RestartAlt"
+						         Size="Size.Small"
+						         Color="Color.Warning"/>
+						<MudText Typo="Typo.caption">
+							Restart Required
+						</MudText>
+					</MudStack>
+
+				</MudStack>
+				<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0" Class="mt-2">
+					<MudChip Size="Size.Small"
+					         Variant="Variant.Text"
+					         Icon="@Icons.Material.Filled.Key" T="string"
+					         Style="font-family: monospace; margin-right: 0;">
+						MustMail__Mail__MailRetentionDays
+					</MudChip>
+
+					<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+					               Size="Size.Small"
+					               OnClick="@(() => CopyToClipboard("MustMail__Mail__MailRetentionDays"))"/>
 				</MudStack>
 			</MudItem>
 		</MudGrid>

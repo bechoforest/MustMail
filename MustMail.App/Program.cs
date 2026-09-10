@@ -26,6 +26,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Polly;
+using MustMail.App.API;
 
 // Create builder
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -512,30 +513,42 @@ builder.Services.AddResiliencePipeline("graph-send", static (builder, context) =
     });
 });
 
-// If we are storing emails create the cleanup job
-if (mustMailConfiguration.Mail.StoreMail)
-{
-    _ = builder.Services.AddQuartz(q => {
+// Create jobs to clean up expired messages and, if we are storing emails, their content on disk
+_ = builder.Services.AddQuartz(q => {
+    // Run job now
+    _ = q.ScheduleJob<CleanupMailService>(trigger => trigger
+                                          .WithIdentity("Cleanup Job Immediate")
+                                          .StartNow()
+                                     );
+
+    // Run job on the hour every hour
+    _ = q.ScheduleJob<CleanupMailService>(trigger => trigger
+                                          .WithIdentity("Cleanup Job Hourly")
+                                          .WithCronSchedule("0 0 * * * ?")
+                                          .WithDescription("Remove any emails older than the retention configuration every hour")
+                                     );
+    
+    if (mustMailConfiguration.Mail.StoreMailContent)
+    {
         // Run job now
-        _ = q.ScheduleJob<CleanupService>(trigger => trigger
-                                              .WithIdentity("Cleanup Job Immediate")
+        _ = q.ScheduleJob<CleanupMailContentService>(trigger => trigger
+                                              .WithIdentity("Cleanup Content Job Immediate")
                                               .StartNow()
                                          );
 
         // Run job on the hour every hour
-        _ = q.ScheduleJob<CleanupService>(trigger => trigger
-                                              .WithIdentity("Cleanup Job Hourly")
+        _ = q.ScheduleJob<CleanupMailContentService>(trigger => trigger
+                                              .WithIdentity("Cleanup Content Job Hourly")
                                               .WithCronSchedule("0 0 * * * ?")
-                                              .WithDescription("Remove any emails older than the retention configuration every hour")
+                                              .WithDescription("Remove any email content older than the retention configuration every hour")
                                          );
-    });
+    }
+});
 
-    _ = builder.Services.AddQuartzHostedService(options => {
-        // when shutting down we want jobs to complete gracefully
-        options.WaitForJobsToComplete = true;
-    });
-
-}
+_ = builder.Services.AddQuartzHostedService(options => {
+    // when shutting down we want jobs to complete gracefully
+    options.WaitForJobsToComplete = true;
+});
 
 // Only register the web UI if it is enabled
 if (mustMailConfiguration.Web.Enabled)
@@ -628,7 +641,7 @@ if (mustMailConfiguration.Web.Enabled)
 }
 
 // Create folder maildrop if we are storing emails
-if (mustMailConfiguration.Mail.StoreMail)
+if (mustMailConfiguration.Mail.StoreMailContent)
 {
     // Create maildrop folder
     string maildropFolder = Path.Combine(dataFolder, "maildrop");
@@ -638,17 +651,13 @@ if (mustMailConfiguration.Mail.StoreMail)
         app.Logger.LogInformation("Using maildrop folder in data directory: {MaildropPath}", maildropFolder);
 }
 
-// Map static folder maildrop if we are storing emails and the web UI is enabled
-if (mustMailConfiguration.Web.Enabled && mustMailConfiguration.Mail.StoreMail)
+// Map maildrop endpoints for downloading stored emails and attachments if we are storing emails and the web UI is enabled.
+if (mustMailConfiguration.Web.Enabled && mustMailConfiguration.Mail.StoreMailContent)
 {
-   
-    // Create a custom static path at /maildrop for eml files and attachments 
-    _ = app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(Path.Combine(dataFolder, "maildrop")),
-        RequestPath = "/maildrop",
-        OnPrepareResponse = MaildropStaticFileAuth.OnPrepareResponse
-    });
+    RouteGroupBuilder maildrop = app.MapGroup("/maildrop").RequireAuthorization();
+
+    maildrop.MapGet("/{messageId}.eml", MaildropEndpoints.DownloadEmail);
+    maildrop.MapGet("/{messageId}/{fileName}", MaildropEndpoints.DownloadAttachment);
 }
 
 if (mustMailConfiguration.Web.Enabled)

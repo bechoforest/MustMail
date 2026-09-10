@@ -39,14 +39,15 @@
         <MudPaper Elevation="3" Class="pa-4 d-flex align-center">
             <MudIcon Icon="@Icons.Material.Filled.Inbox" Color="Color.Primary" Size="Size.Large" Class="me-3" />
             <div>
-                <MudText Typo="Typo.subtitle2">Emails Stored</MudText>
-                @if (!StoreMail)
+                <MudText Typo="Typo.subtitle2">Emails</MudText>
+                <MudText Typo="Typo.h4">@EmailCount</MudText>
+                @if (StoreMailContent)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Warning">Storage disabled</MudText>
+                    <MudText Typo="Typo.caption">@ContentStoredCount with content stored</MudText>
                 }
                 else
                 {
-                    <MudText Typo="Typo.h4">@EmailCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning">Content storage disabled</MudText>
                 }
             </div>
         </MudPaper>
@@ -57,11 +58,7 @@
             <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Primary" Size="Size.Large" Class="me-3" />
             <div>
                 <MudText Typo="Typo.subtitle2">Last Email</MudText>
-                @if (!StoreMail)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Warning">Storage disabled</MudText>
-                }
-                else if (MostRecentMessage != DateTime.MinValue)
+                @if (MostRecentMessage != DateTime.MinValue)
                 {
                     <MudText Typo="Typo.h6">@FormatRelativeTime(MostRecentMessage)</MudText>
                 }
@@ -90,16 +87,28 @@
 
     <MudItem xs="12" sm="6" md="3">
         <MudPaper Elevation="3" Class="pa-4 d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead" Color="Color.Success" Size="Size.Large" Class="me-3" />
+            <div>
+                <MudText Typo="Typo.subtitle2">Message Retention</MudText>
+                <MudText Typo="Typo.h6">@MailRetentionDays days</MudText>
+                <MudLink Href="/admin/config/mail" Typo="Typo.caption">Configure</MudLink>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 d-flex align-center">
             <MudIcon Icon="@Icons.Material.Filled.Storage"
-                     Color="@(StoreMail ? Color.Success : Color.Error)"
+                     Color="@(StoreMailContent ? Color.Success : Color.Error)"
                      Size="Size.Large" Class="me-3" />
             <div>
-                <MudText Typo="Typo.subtitle2">Mail Storage</MudText>
-                <MudText Typo="Typo.h6">@(StoreMail ? "Enabled" : "Disabled")</MudText>
-                @if (StoreMail)
+                <MudText Typo="Typo.subtitle2">Content Storage</MudText>
+                <MudText Typo="Typo.h6">@(StoreMailContent ? "Enabled" : "Disabled")</MudText>
+                @if (StoreMailContent)
                 {
-                    <MudText Typo="Typo.caption">@RetentionDays day retention</MudText>
+                    <MudText Typo="Typo.caption">@MailContentRetentionDays day retention</MudText>
                 }
+                <MudLink Href="/admin/config/mail" Typo="Typo.caption">Configure</MudLink>
             </div>
         </MudPaper>
     </MudItem>
@@ -122,8 +131,29 @@
                      Size="Size.Large" Class="me-3" />
             <div>
                 <MudText Typo="Typo.subtitle2">Insecure SMTP</MudText>
-                <MudText Typo="Typo.h6">@(AllowInsecure ? "Allowed" : "Blocked")</MudText>
+                <MudText Typo="Typo.h6">@(AllowInsecure ? "Enabled" : "Disabled")</MudText>
                 <MudLink Href="/admin/config/smtp" Typo="Typo.caption">Configure</MudLink>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.VerifiedUser"
+                     Color="@(CertificateExpiry is null ? Color.Error : CertificateExpiry <= DateTime.UtcNow.AddDays(14) ? Color.Warning : Color.Success)"
+                     Size="Size.Large" Class="me-3" />
+            <div>
+                <MudText Typo="Typo.subtitle2">Certificate</MudText>
+                @if (CertificateExpiry is null)
+                {
+                    <MudText Typo="Typo.h6">Unavailable</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h6">@CertificateCommonName</MudText>
+                    <MudText Typo="Typo.caption">Expires @CertificateExpiry.Value.ToString("dd MMM yyyy")</MudText>
+                }
+                <MudLink Href="/admin/config/certificate" Typo="Typo.caption">Configure</MudLink>
             </div>
         </MudPaper>
     </MudItem>

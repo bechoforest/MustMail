@@ -47,8 +47,9 @@ public class SmtpConfiguration
 public class MailConfiguration
 {
     public bool TrustFrom { get; set; }
-    public bool StoreMail { get; set; } = true;
-    public int RetentionDays { get; set; } = 7;
+    public bool StoreMailContent { get; set; } = true;
+    public int MailContentRetentionDays { get; set; } = 30;
+    public int MailRetentionDays { get; set; } = 1461;
     public List<string> AllowedSenders { get; set; } = [];
     public List<string> AllowedRecipients { get; set; } = [];
     public bool FooterBranding { get; set; } = true;

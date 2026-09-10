@@ -6,9 +6,7 @@
 
 <MudGrid Class="mt-1">
 
-	@* Stat cards — only displayed when storemail is on*@
-	@if (StoreEmails)
-	{
+	@* Stat cards *@
 		<MudItem xs="6">
 			<MudPaper Elevation="3" Class="pa-4 d-flex align-center">
 				<MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Primary" Size="Size.Large" Class="me-3" />
@@ -36,18 +34,10 @@
 				</div>
 			</MudPaper>
 		</MudItem>
-	}
 
 	@* Inbox *@
 	<MudItem xs="12">
-		@if (!StoreEmails)
-		{
-			<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" ContentAlignment="HorizontalAlignment.Center" Class="mt-2">
-				MustMail has been configured to not store emails. No emails will be displayed here.<br />
-				Emails passed through MustMail should reach your inbox directly.
-			</MudAlert>
-		}
-		else if (Messages.Count > 0 && UserId != null)
+		@if (Messages.Count > 0 && UserId != null)
 		{
 			@if (IsMobile)
 			{
@@ -94,12 +84,15 @@
 
 						<MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
 							<MudText Typo="Typo.h6">@MobileSelectedMessage.Subject</MudText>
-							<MudTooltip Text="Download .eml">
-								<MudIconButton Icon="@Icons.Material.Filled.Download"
-								               Variant="Variant.Outlined" Size="Size.Small"
-								               Href="@Helpers.SanitizeFilePath(Path.Combine("maildrop", UserId, $"{MobileSelectedMessage.Id}.eml"))"
-								               Target="_blank" />
-							</MudTooltip>
+							@if (MobileSelectedMessage.ContentStored && StoreMailContent)
+							{
+								<MudTooltip Text="Download .eml">
+									<MudIconButton Icon="@Icons.Material.Filled.Download"
+									               Variant="Variant.Outlined" Size="Size.Small"
+									               Href="@Path.Combine("maildrop", $"{MobileSelectedMessage.Id}.eml")"
+									               Target="_blank" />
+								</MudTooltip>
+							}
 						</MudStack>
 
 						<MudStack Spacing="0">
@@ -113,33 +106,33 @@
 
 						<MudDivider />
 
+						<MudStack Spacing="1">
+							@if (FormatRecipients(MobileSelectedMessage, RecipientType.To) is { Length: > 0 } mobileTo)
+							{
+								<MudStack Row Spacing="1">
+									<MudText Typo="Typo.body2" Style="font-weight:bold">To:</MudText>
+									<MudText Typo="Typo.body2">@mobileTo</MudText>
+								</MudStack>
+							}
+							@if (FormatRecipients(MobileSelectedMessage, RecipientType.Cc) is { Length: > 0 } mobileCc)
+							{
+								<MudStack Row Spacing="1">
+									<MudText Typo="Typo.body2" Style="font-weight:bold">Cc:</MudText>
+									<MudText Typo="Typo.body2">@mobileCc</MudText>
+								</MudStack>
+							}
+							@if (IsUserBcc(MobileSelectedMessage))
+							{
+								<MudStack Row Spacing="1">
+									<MudText Typo="Typo.body2" Style="font-weight:bold">Bcc:</MudText>
+									<MudText Typo="Typo.body2">@UserEmail</MudText>
+								</MudStack>
+							}
+						</MudStack>
+
 						@if (ActiveMessage != null)
 						{
-							<MudStack Spacing="1">
-								@if (ActiveMessage.To.Any())
-								{
-									<MudStack Row Spacing="1">
-										<MudText Typo="Typo.body2" Style="font-weight:bold">To:</MudText>
-										<MudText Typo="Typo.body2">@ActiveMessage.To</MudText>
-									</MudStack>
-								}
-								@if (ActiveMessage.Cc.Any())
-								{
-									<MudStack Row Spacing="1">
-										<MudText Typo="Typo.body2" Style="font-weight:bold">Cc:</MudText>
-										<MudText Typo="Typo.body2">@ActiveMessage.Cc</MudText>
-									</MudStack>
-								}
-								@if (ActiveMessage.Bcc.Any())
-								{
-									<MudStack Row Spacing="1">
-										<MudText Typo="Typo.body2" Style="font-weight:bold">Bcc:</MudText>
-										<MudText Typo="Typo.body2">@ActiveMessage.Bcc</MudText>
-									</MudStack>
-								}
-							</MudStack>
-
-							@if (ActiveMessage.Attachments.Any())
+							@if (StoreMailContent && ActiveMessage.Attachments.Any())
 							{
 								<MudPaper Elevation="0" Class="pa-2">
 									<MudStack Spacing="1">
@@ -154,8 +147,7 @@
 												{
 													case MimePart { FileName: not null, Content: not null } mimePart:
 													{
-														string attachmentPath = Helpers.SanitizeFilePath(
-															Path.Combine("maildrop", UserId, MobileSelectedMessage.Id, mimePart.FileName));
+														string attachmentPath = Path.Combine("maildrop", MobileSelectedMessage.Id, Helpers.SanitizeFileName(mimePart.FileName));
 														<MudChip Class="me-1 mb-1" T="string" Variant="Variant.Outlined"
 														         Color="Color.Default" Href="@attachmentPath" Target="_blank">
 															<MudText Typo="Typo.body2" Class="me-2">@mimePart.FileName</MudText>
@@ -186,6 +178,14 @@
 								</MudText>
 							</MudPaper>
 						}
+						else
+						{
+							<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-1">
+								@(!StoreMailContent
+									? "Email content storage is disabled on this server, so only this email's details were kept."
+									: "This email's content has been removed after the retention period expired. Only its details remain.")
+							</MudAlert>
+						}
 					</MudStack>
 				}
 			}
@@ -201,16 +201,19 @@
 					{
 						<MudTabPanel ID="@message.Id" Style="width: 100%">
 							<ChildContent>
-								<MudStack Spacing="2">
+								<MudStack Spacing="2" Style="width:100%">
 
 									<MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
 										<MudText Typo="Typo.h6">@message.Subject</MudText>
-										<MudTooltip Text="Download .eml">
-											<MudIconButton Icon="@Icons.Material.Filled.Download"
-											               Variant="Variant.Outlined" Size="Size.Small"
-											               Href="@Helpers.SanitizeFilePath(Path.Combine("maildrop", UserId, $"{message.Id}.eml"))"
-											               Target="_blank" />
-										</MudTooltip>
+										@if (message.ContentStored && StoreMailContent)
+										{
+											<MudTooltip Text="Download .eml">
+												<MudIconButton Icon="@Icons.Material.Filled.Download"
+												               Variant="Variant.Outlined" Size="Size.Small"
+												               Href="@Path.Combine("maildrop", $"{message.Id}.eml")"
+												               Target="_blank" />
+											</MudTooltip>
+										}
 									</MudStack>
 
 									<MudStack Spacing="1">
@@ -236,32 +239,32 @@
 										<MudDivider />
 									</MudStack>
 
+									<MudStack Spacing="1" Class="mt-1">
+										@if (FormatRecipients(message, RecipientType.To) is { Length: > 0 } desktopTo)
+										{
+											<MudStack Row Spacing="1">
+												<MudText Typo="Typo.body2" Style="font-weight:bold">To:</MudText>
+												<MudText Typo="Typo.body2">@desktopTo</MudText>
+											</MudStack>
+										}
+										@if (FormatRecipients(message, RecipientType.Cc) is { Length: > 0 } desktopCc)
+										{
+											<MudStack Row Spacing="1">
+												<MudText Typo="Typo.body2" Style="font-weight:bold">Cc:</MudText>
+												<MudText Typo="Typo.body2">@desktopCc</MudText>
+											</MudStack>
+										}
+										@if (IsUserBcc(message))
+										{
+											<MudStack Row Spacing="1">
+												<MudText Typo="Typo.body2" Style="font-weight:bold">Bcc:</MudText>
+												<MudText Typo="Typo.body2">@UserEmail</MudText>
+											</MudStack>
+										}
+									</MudStack>
+
 									@if (ActiveMessage != null)
 									{
-										<MudStack Spacing="1" Class="mt-1">
-											@if (ActiveMessage.To.Any())
-											{
-												<MudStack Row Spacing="1">
-													<MudText Typo="Typo.body2" Style="font-weight:bold">To:</MudText>
-													<MudText Typo="Typo.body2">@ActiveMessage.To</MudText>
-												</MudStack>
-											}
-											@if (ActiveMessage.Cc.Any())
-											{
-												<MudStack Row Spacing="1">
-													<MudText Typo="Typo.body2" Style="font-weight:bold">Cc:</MudText>
-													<MudText Typo="Typo.body2">@ActiveMessage.Cc</MudText>
-												</MudStack>
-											}
-											@if (ActiveMessage.Bcc.Any())
-											{
-												<MudStack Row Spacing="1">
-													<MudText Typo="Typo.body2" Style="font-weight:bold">Bcc:</MudText>
-													<MudText Typo="Typo.body2">@ActiveMessage.Bcc</MudText>
-												</MudStack>
-											}
-										</MudStack>
-
 										@if (ActiveMessage.Attachments.Any())
 										{
 											<MudPaper Elevation="0" Class="pa-2">
@@ -277,8 +280,7 @@
 															{
 																case MimePart { FileName: not null, Content: not null } mimePart:
 																{
-																	string attachmentPath = Helpers.SanitizeFilePath(
-																		Path.Combine("maildrop", UserId, message.Id, mimePart.FileName));
+																	string attachmentPath = Path.Combine("maildrop", message.Id, Helpers.SanitizeFileName(mimePart.FileName));
 																	<MudChip Class="me-1 mb-1" T="string" Variant="Variant.Outlined"
 																	         Color="Color.Default" Href="@attachmentPath" Target="_blank">
 																		<MudText Typo="Typo.body2" Class="me-2">@mimePart.FileName</MudText>
@@ -308,6 +310,14 @@
 												}
 											</MudText>
 										</MudPaper>
+									}
+									else
+									{
+										<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-1">
+											@(!StoreMailContent
+												? "Email content storage is disabled on this server, so only this email's details were kept."
+												: "This email's content has been removed after the retention period expired. Only its details remain.")
+										</MudAlert>
 									}
 								</MudStack>
 							</ChildContent>
