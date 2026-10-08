@@ -70,6 +70,40 @@ public partial class AttachmentHandler(ILogger<AttachmentHandler> logger)
             }
         }
 
+        // Inline body parts referenced from the HTML as cid:xyz (e.g. embedded images).
+        foreach (MimePart inlinePart in message.BodyParts.OfType<MimePart>())
+        {
+            if (inlinePart.IsAttachment
+                || string.IsNullOrEmpty(inlinePart.ContentId)
+                || inlinePart.Content is null
+                || inlinePart.ContentType.IsMimeType("text", "*"))
+                continue;
+
+            string fileName = inlinePart.FileName ?? inlinePart.ContentId;
+
+            // Replace invalid characters with hyphens
+            Array.ForEach(Path.GetInvalidFileNameChars(),
+                          c => fileName = fileName.Replace(c.ToString(), "-"));
+
+            // Write to byte stream
+            using MemoryStream memory = new();
+            await inlinePart.Content.DecodeToAsync(memory);
+            byte[] inlineBytes = memory.ToArray();
+
+            // Create inline graph attachment; ContentId must match the cid: reference in the HTML body
+            attachments.Add(new FileAttachment
+            {
+                OdataType = "#microsoft.graph.fileAttachment",
+                Name = fileName,
+                ContentType = inlinePart.ContentType.MimeType,
+                ContentBytes = inlineBytes,
+                ContentId = inlinePart.ContentId,
+                IsInline = true
+            });
+
+            LogInlineAttachment(fileName, inlinePart.ContentId, inlineBytes.Length, inlinePart.ContentType.MimeType);
+        }
+
         return attachments;
     }
     // 1140s = MessageHandler 
@@ -77,4 +111,6 @@ public partial class AttachmentHandler(ILogger<AttachmentHandler> logger)
     private partial void LogAttachment(string fileName, int size, string contentType);
     [LoggerMessage(EventId = 1141, Level = LogLevel.Debug, Message = "Processing embedded message: {Name}, Size: {Size} bytes")]
     private partial void LogEmbeddedMessage(string name, int size);
+    [LoggerMessage(EventId = 1142, Level = LogLevel.Debug, Message = "Processing inline attachment: {FileName}, Content-ID: {ContentId}, Size: {Size} bytes, Type: {ContentType}")]
+    private partial void LogInlineAttachment(string fileName, string contentId, int size, string contentType);
 }

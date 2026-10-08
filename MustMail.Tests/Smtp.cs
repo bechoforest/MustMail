@@ -1,7 +1,9 @@
 ﻿using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
 using MimeKit;
+using MustMail.App.Services.MailProcessing;
 using System.Net.Sockets;
 
 namespace MustMail.Tests;
@@ -410,6 +412,70 @@ public class Smtp
         message.Body = builder.ToMessageBody();
 
         await client.SendAsync(message, TestContext.CancellationToken);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [TestCategory("SMTP")]
+    [Description("Verifies inline (cid:) body parts are forwarded to Graph as inline attachments")]
+    public async Task SMTP_InlineAttachment_IsForwardedAsInline()
+    {
+        MimeMessage message = CreateMessage(subject: "Test: InlineAttachment_IsForwardedAsInline",
+                                            body: "InlineAttachment_IsForwardedAsInline");
+
+        BodyBuilder builder = new()
+        {
+            HtmlBody = "<html><body><p>Inline image below:</p><img src=\"cid:test-image\"></body></html>"
+        };
+
+        MimePart image = new("image", "png")
+        {
+            Content = new MimeContent(new MemoryStream([1, 2, 3, 4])),
+            ContentId = "test-image",
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+            ContentTransferEncoding = ContentEncoding.Base64
+        };
+
+        builder.LinkedResources.Add(image);
+
+        message.Body = builder.ToMessageBody();
+
+        AttachmentHandler handler = new(NullLogger<AttachmentHandler>.Instance);
+        List<Microsoft.Graph.Models.Attachment> attachments = await handler.HandelAttachments(message);
+
+        Assert.HasCount(1, attachments);
+        Microsoft.Graph.Models.FileAttachment attachment = (Microsoft.Graph.Models.FileAttachment)attachments[0];
+        Assert.IsTrue(attachment.IsInline);
+        Assert.AreEqual("test-image", attachment.ContentId);
+        Assert.AreEqual("image/png", attachment.ContentType);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, attachment.ContentBytes);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [TestCategory("SMTP")]
+    [Description("Verifies regular attachments are forwarded to Graph once and not as inline")]
+    public async Task SMTP_Attachment_IsForwardedNotInline()
+    {
+        MimeMessage message = CreateMessage(subject: "Test: Attachment_IsForwardedNotInline",
+                                            body: "Attachment_IsForwardedNotInline");
+
+        BodyBuilder builder = new()
+        {
+            TextBody = "Message with attachment"
+        };
+
+        builder.Attachments.Add("test.txt", System.Text.Encoding.UTF8.GetBytes("hello"));
+
+        message.Body = builder.ToMessageBody();
+
+        AttachmentHandler handler = new(NullLogger<AttachmentHandler>.Instance);
+        List<Microsoft.Graph.Models.Attachment> attachments = await handler.HandelAttachments(message);
+
+        Assert.HasCount(1, attachments);
+        Microsoft.Graph.Models.FileAttachment attachment = (Microsoft.Graph.Models.FileAttachment)attachments[0];
+        Assert.AreNotEqual(true, attachment.IsInline);
+        Assert.AreEqual("test.txt", attachment.Name);
     }
 
     [TestMethod]

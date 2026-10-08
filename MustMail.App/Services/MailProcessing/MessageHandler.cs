@@ -103,8 +103,8 @@ public partial class MessageHandler(ILogger<MessageHandler> logger, GraphService
 
         List<Attachment> attachments = [];
         
-        // If message contains attachments then extract them from the message
-        if (message.Attachments.Any())
+        // Extract file attachments and inline (cid:) body parts from the message
+        if (message.Attachments.Any() || message.BodyParts.OfType<MimePart>().Any(p => !p.IsAttachment && !string.IsNullOrEmpty(p.ContentId)))
             attachments = await attachmentHandler.HandelAttachments(message);
 
         // If store emails is enabled for each recipient that has an account store a copy of the email on disk
