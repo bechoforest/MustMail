@@ -299,6 +299,17 @@ if (!result.Successful)
     throw new InvalidOperationException("Database migration failed!");
 }
 
+// Resolve the Entra authority host and Graph endpoint (configurable for national/sovereign clouds)
+if (!Uri.TryCreate(mustMailConfiguration.Graph.AuthorityHost, UriKind.Absolute, out Uri? graphAuthorityHost) ||
+    graphAuthorityHost.Scheme != Uri.UriSchemeHttps)
+    throw new InvalidOperationException("Graph:AuthorityHost must be an absolute HTTPS URL, e.g. https://login.microsoftonline.com/.");
+
+if (!Uri.TryCreate(mustMailConfiguration.Graph.Endpoint, UriKind.Absolute, out Uri? graphEndpointUri) ||
+    graphEndpointUri.Scheme != Uri.UriSchemeHttps)
+    throw new InvalidOperationException("Graph:Endpoint must be an absolute HTTPS URL, e.g. https://graph.microsoft.com.");
+
+string graphEndpoint = graphEndpointUri.GetLeftPart(UriPartial.Authority);
+
 // Create client secret credential to authenticate against Microsoft graph
 builder.Services.AddSingleton<TokenCredential>(_ => new ClientSecretCredential(
                                                                               mustMailConfiguration.Graph.TenantId,
@@ -306,14 +317,14 @@ builder.Services.AddSingleton<TokenCredential>(_ => new ClientSecretCredential(
                                                                                 mustMailConfiguration.Graph.ClientSecret,
                                                                                new ClientSecretCredentialOptions
                                                                                {
-                                                                                   AuthorityHost = AzureAuthorityHosts.AzurePublicCloud
+                                                                                   AuthorityHost = graphAuthorityHost
                                                                                }
                                                                               ));
 
 // Create the Microsoft graph client
 builder.Services.AddSingleton(sp => {
     TokenCredential credential = sp.GetRequiredService<TokenCredential>();
-    return new GraphServiceClient(credential, ["https://graph.microsoft.com/.default"]);
+    return new GraphServiceClient(credential, [$"{graphEndpoint}/.default"], $"{graphEndpoint}/v1.0");
 });
 
 // Add forward headers for reverse proxy

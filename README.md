@@ -489,6 +489,22 @@ For security reasons, the following settings must be provided using environment 
 
 MustMail will fail to start if any required environment variables are missing.
 
+### National / Sovereign Clouds
+
+By default MustMail connects to the Microsoft global (commercial) cloud. To use a Microsoft national cloud, set the Entra authority host and Microsoft Graph endpoint for that cloud:
+
+| Cloud | `MustMail__Graph__AuthorityHost` | `MustMail__Graph__Endpoint` |
+| --- | --- | --- |
+| Global (default) | `https://login.microsoftonline.com/` | `https://graph.microsoft.com` |
+| US Government GCC | `https://login.microsoftonline.com/` | `https://graph.microsoft.com` |
+| US Government GCC High (L4) | `https://login.microsoftonline.us/` | `https://graph.microsoft.us` |
+| US Government DoD (L5) | `https://login.microsoftonline.us/` | `https://dod-graph.microsoft.us` |
+| China (21Vianet) | `https://login.chinacloudapi.cn/` | `https://microsoftgraph.chinacloudapi.cn` |
+
+GCC tenants use the same endpoints as the global cloud, so no changes are needed. Source: [Microsoft Graph national cloud deployments](https://learn.microsoft.com/en-us/graph/deployments).
+
+If you use Microsoft Entra ID for the web UI login, also make sure `MustMail__OpenIdConnect__Authority` points at the same cloud's authority host.
+
 ### Databases
 
 By default MustMail uses an SQLite database stored in the Data directory. When running in Docker this directory is located at /app/Data. However if you wish you can change this path or use a completely different database. MustMail supports the following databases:

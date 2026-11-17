@@ -25,6 +25,8 @@ public class MicrosoftGraphConfiguration
 
     [JsonIgnore]
     public string? ClientSecret { get; set; }
+    public string AuthorityHost { get; set; } = "https://login.microsoftonline.com/";
+    public string Endpoint { get; set; } = "https://graph.microsoft.com";
 }
 
 public class OpenIdConnectConfiguration

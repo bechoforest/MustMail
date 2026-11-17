@@ -216,6 +216,144 @@
 				               OnClick="@(() => CopyToClipboard("MustMail__Graph__ClientSecret"))"/>
 			</MudStack>
 		</MudItem>
+
+		@* Authority Host *@
+		<MudItem xs="12" md="6">
+
+			<MudStack Row AlignItems="AlignItems.Center" Spacing="0" Class="mb-1" Wrap="Wrap.Wrap">
+				<MudText Typo="Typo.subtitle1" Style="font-weight: bold;">
+					Authority Host
+				</MudText>
+
+				<MudSpacer/>
+
+				@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Graph:AuthorityHost"))
+				{
+					<MudChip Color="Color.Primary" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Storage">
+						Environment Variable
+					</MudChip>
+				}
+				else
+				{
+					<MudChip Color="Color.Info" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Description">
+						appsettings.json
+					</MudChip>
+				}
+
+			</MudStack>
+
+			<MudTextField T="string" Variant="Variant.Outlined"
+			              Disabled="true"
+			              HelperText="Change only for national/sovereign clouds"
+			              Value="@Configuration.Graph.AuthorityHost"/>
+
+			<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.Settings"
+					         Size="Size.Small"/>
+					<MudText Typo="Typo.caption">
+						Environment Variable
+					</MudText>
+				</MudStack>
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.RestartAlt"
+					         Size="Size.Small"
+					         Color="Color.Warning"/>
+					<MudText Typo="Typo.caption">
+						Restart Required
+					</MudText>
+				</MudStack>
+
+			</MudStack>
+			<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0" Class="mt-2">
+
+				<MudChip Size="Size.Small"
+				         Variant="Variant.Text"
+				         Icon="@Icons.Material.Filled.Settings" T="string"
+				         Style="font-family: monospace; margin-right: 0;">
+					MustMail__Graph__AuthorityHost
+				</MudChip>
+
+				<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+				               Size="Size.Small"
+				               OnClick="@(() => CopyToClipboard("MustMail__Graph__AuthorityHost"))"/>
+			</MudStack>
+		</MudItem>
+
+		@* Graph Endpoint *@
+		<MudItem xs="12" md="6">
+
+			<MudStack Row AlignItems="AlignItems.Center" Spacing="0" Class="mb-1" Wrap="Wrap.Wrap">
+				<MudText Typo="Typo.subtitle1" Style="font-weight: bold;">
+					Graph Endpoint
+				</MudText>
+
+				<MudSpacer/>
+
+				@if (Helpers.IsOverriddenByEnvironmentVariable(RawConfiguration, "Graph:Endpoint"))
+				{
+					<MudChip Color="Color.Primary" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Storage">
+						Environment Variable
+					</MudChip>
+				}
+				else
+				{
+					<MudChip Color="Color.Info" T="string" Variant="Variant.Text"
+					         Size="Size.Small"
+					         Icon="@Icons.Material.Filled.Description">
+						appsettings.json
+					</MudChip>
+				}
+
+			</MudStack>
+
+			<MudTextField T="string" Variant="Variant.Outlined"
+			              Disabled="true"
+			              HelperText="Change only for national/sovereign clouds"
+			              Value="@Configuration.Graph.Endpoint"/>
+
+			<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mt-4">
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.Settings"
+					         Size="Size.Small"/>
+					<MudText Typo="Typo.caption">
+						Environment Variable
+					</MudText>
+				</MudStack>
+
+				<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+					<MudIcon Icon="@Icons.Material.Filled.RestartAlt"
+					         Size="Size.Small"
+					         Color="Color.Warning"/>
+					<MudText Typo="Typo.caption">
+						Restart Required
+					</MudText>
+				</MudStack>
+
+			</MudStack>
+			<MudStack Row AlignItems="AlignItems.Center" Justify="Justify.Center" Spacing="0" Class="mt-2">
+
+				<MudChip Size="Size.Small"
+				         Variant="Variant.Text"
+				         Icon="@Icons.Material.Filled.Settings" T="string"
+				         Style="font-family: monospace; margin-right: 0;">
+					MustMail__Graph__Endpoint
+				</MudChip>
+
+				<MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+				               Size="Size.Small"
+				               OnClick="@(() => CopyToClipboard("MustMail__Graph__Endpoint"))"/>
+			</MudStack>
+		</MudItem>
 	</MudGrid>
 </MudForm>
 
