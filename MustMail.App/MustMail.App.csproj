@@ -90,8 +90,4 @@
         </Content>
     </ItemGroup>
 
-    <ItemGroup>
-      <Content Remove="..\MustMail.Migrations.Sqlite\Scripts\0001_Initial.sql" />
-    </ItemGroup>
-
 </Project>
